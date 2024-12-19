@@ -1,0 +1,102 @@
+using System;
+using System.Collections.Generic;
+
+public class MultiplexPageRank
+{
+    public static double[] ComputePageRank(List<double[,]> adjacencyMatrices, double alpha, double tol, int maxIter)
+    {
+        // Number of nodes
+        int n = adjacencyMatrices[0].GetLength(0);
+        // Number of layers
+        int numLayers = adjacencyMatrices.Count;
+
+        // Step 1: Normalize each layer's adjacency matrix to a transition matrix
+        double[,,] P = new double[n, n, numLayers];
+        for (int k = 0; k < numLayers; k++)
+        {
+            double[,] Ak = adjacencyMatrices[k];
+            double[] outDegree = new double[n];
+            
+            // Compute out-degree (row sum)
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < n; j++)
+                {
+                    outDegree[i] += Ak[i, j];
+                }
+                if (outDegree[i] == 0) outDegree[i] = 1; // Handle dangling nodes
+            }
+
+            // Normalize rows
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < n; j++)
+                {
+                    P[i, j, k] = Ak[i, j] / outDegree[i];
+                }
+            }
+        }
+
+        // Step 2: Combine the transition matrices across layers
+        double[] W = new double[numLayers];
+        for (int k = 0; k < numLayers; k++) W[k] = 1.0 / numLayers; // Equal weights
+
+        double[,] P_combined = new double[n, n];
+        for (int i = 0; i < n; i++)
+        {
+            for (int j = 0; j < n; j++)
+            {
+                P_combined[i, j] = 0;
+                for (int k = 0; k < numLayers; k++)
+                {
+                    P_combined[i, j] += W[k] * P[i, j, k];
+                }
+            }
+        }
+
+        // Step 3: Implement the PageRank algorithm
+        // Initialize rank vector
+        double[] ranks = new double[n];
+        double[] teleport = new double[n];
+        for (int i = 0; i < n; i++)
+        {
+            ranks[i] = 1.0 / n;
+            teleport[i] = 1.0 / n;
+        }
+
+        // Iterate until convergence or max iterations
+        double[] newRanks = new double[n];
+        int iter;
+        for (iter = 0; iter < maxIter; iter++)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                newRanks[i] = 0;
+                for (int j = 0; j < n; j++)
+                {
+                    newRanks[i] += alpha * P_combined[j, i] * ranks[j];
+                }
+                newRanks[i] += (1 - alpha) * teleport[i];
+            }
+
+            // Check for convergence
+            double diff = 0;
+            for (int i = 0; i < n; i++)
+            {
+                diff += Math.Abs(newRanks[i] - ranks[i]);
+            }
+            if (diff < tol) break;
+
+            // Update ranks
+            Array.Copy(newRanks, ranks, n);
+        }
+
+        // Normalize ranks to sum to 1
+        double sumRanks = 0;
+        for (int i = 0; i < n; i++) sumRanks += ranks[i];
+        for (int i = 0; i < n; i++) ranks[i] /= sumRanks;
+
+        Console.WriteLine($"Converged after {iter + 1} iterations.");
+        return ranks;
+    }
+}
