@@ -1,0 +1,73 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+public class MultiplexVoteRank
+{
+    public static List<int> ComputeVoteRank(List<double[,]> adjacencyMatrices, int maxRank)
+    {
+        // Number of nodes
+        int n = adjacencyMatrices[0].GetLength(0);
+        // Number of layers
+        int numLayers = adjacencyMatrices.Count;
+
+        // Step 1: Aggregate the layers into a single influence matrix
+        double[,] A_combined = new double[n, n];
+        double[] W = Enumerable.Repeat(1.0 / numLayers, numLayers).ToArray(); // Equal weights
+
+        for (int k = 0; k < numLayers; k++)
+        {
+            double[,] Ak = adjacencyMatrices[k];
+            for (int i = 0; i < n; i++)
+            {
+                for (int j = 0; j < n; j++)
+                {
+                    A_combined[i, j] += W[k] * Ak[i, j];
+                }
+            }
+        }
+
+        // Step 2: Initialize voting capacities
+        double[] votingCapacity = Enumerable.Repeat(1.0, n).ToArray(); // Each node starts with full voting capacity
+        double[] influence = new double[n];
+        for (int i = 0; i < n; i++)
+        {
+            for (int j = 0; j < n; j++)
+            {
+                influence[i] += A_combined[j, i]; // Initial influence score (sum of in-degrees)
+            }
+        }
+
+        // Step 3: Iteratively rank nodes
+        List<int> ranks = new List<int>(); // List of ranked nodes
+
+        for (int rankIndex = 0; rankIndex < maxRank; rankIndex++)
+        {
+            // Find the node with the highest influence score
+            int selectedNode = Array.IndexOf(influence, influence.Max());
+            ranks.Add(selectedNode);
+
+            // Update voting capacities and influence
+            for (int j = 0; j < n; j++)
+            {
+                if (A_combined[selectedNode, j] > 0)
+                {
+                    votingCapacity[j] -= 1;
+                    if (votingCapacity[j] < 0) votingCapacity[j] = 0;
+                }
+            }
+
+            // Update influence scores based on voting capacities
+            for (int i = 0; i < n; i++)
+            {
+                influence[i] = 0;
+                for (int j = 0; j < n; j++)
+                {
+                    influence[i] += A_combined[j, i] * votingCapacity[j];
+                }
+            }
+        }
+
+        return ranks;
+    }
+}
